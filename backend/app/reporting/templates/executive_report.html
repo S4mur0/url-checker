@@ -31,32 +31,41 @@
         <div class="label">Protegidos por Akamai</div>
     </div>
     <div class="stat-card risk">
-        <div class="value">{{ summary.unprotected_online }}</div>
-        <div class="label">Sem proteção e online (risco prioritário)</div>
+        <div class="value">{{ summary.external_unprotected_online }}</div>
+        <div class="label">Externo, online e sem proteção (risco real)</div>
     </div>
     <div class="stat-card">
-        <div class="value">{{ summary.unprotected_offline }}</div>
-        <div class="label">Sem proteção e offline</div>
+        <div class="value">{{ summary.internal_unprotected_online }}</div>
+        <div class="label">Interno, online e sem proteção (risco baixo)</div>
     </div>
     <div class="stat-card">
-        <div class="value">{{ summary.offline }}</div>
-        <div class="label">Offline no momento do scan</div>
+        <div class="value">{{ summary.external_count }} / {{ summary.internal_count }}</div>
+        <div class="label">Domínios externos / internos</div>
     </div>
 </div>
 
 <div class="narrative">
-    {% if summary.unprotected_online > 0 %}
-    De {{ summary.total }} domínios analisados, <strong>{{ summary.unprotected_online }}</strong> estão
-    online e <strong>sem proteção Akamai detectada</strong> — essa é a lacuna de cobertura WAF prioritária
-    a ser corrigida. A cobertura geral de proteção está em <strong>{{ summary.pct_protected }}%</strong>
-    dos domínios cadastrados.
+    {% if summary.external_unprotected_online > 0 %}
+    De {{ summary.total }} domínios analisados, <strong>{{ summary.external_unprotected_online }}</strong> estão
+    <strong>expostos na internet</strong>, online e <strong>sem proteção Akamai detectada</strong> — essa é a
+    lacuna de cobertura WAF prioritária a ser corrigida.
+    {% if summary.internal_unprotected_online > 0 %}
+    Outros <strong>{{ summary.internal_unprotected_online }}</strong> domínios sem proteção resolvem para IP
+    interno (rede privada) e não são alcançáveis pela internet — risco bem menor, mas vale confirmar que o
+    isolamento de rede é intencional.
+    {% endif %}
+    A cobertura geral de proteção está em <strong>{{ summary.pct_protected }}%</strong> dos domínios cadastrados.
     {% else %}
-    Todos os domínios online analisados neste scan apresentam proteção Akamai detectada. Cobertura
-    geral: <strong>{{ summary.pct_protected }}%</strong> dos domínios cadastrados.
+    Nenhum domínio exposto externamente está sem proteção Akamai neste scan.
+    {% if summary.internal_unprotected_online > 0 %}
+    Há <strong>{{ summary.internal_unprotected_online }}</strong> domínio(s) interno(s) (IP privado) sem
+    proteção — risco baixo, já que não são alcançáveis pela internet.
+    {% endif %}
+    Cobertura geral: <strong>{{ summary.pct_protected }}%</strong> dos domínios cadastrados.
     {% endif %}
 </div>
 
-<h2 class="section-title">Cobertura WAF</h2>
+<h2 class="section-title">Cobertura WAF × Exposição</h2>
 
 <div class="donut-wrap">
     <svg width="150" height="150" viewBox="0 0 150 150">
@@ -84,6 +93,7 @@
     <thead>
         <tr>
             <th>Hostname</th>
+            <th>Exposição</th>
             <th>URL Verificada</th>
             <th>Status</th>
             <th>Código HTTP</th>
@@ -94,6 +104,7 @@
         {% for r in risky %}
         <tr>
             <td>{{ r.domain.hostname }}</td>
+            <td><span class="badge exposure-{{ r.is_internal | exposure_class }}">{{ r.is_internal | exposure_label }}</span></td>
             <td>{{ r.checked_url }}</td>
             <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
             <td>{{ r.http_status_code or "-" }}</td>
@@ -112,6 +123,7 @@
     <thead>
         <tr>
             <th>Hostname</th>
+            <th>Exposição</th>
             <th>Status</th>
             <th>HTTP</th>
             <th>Protegido</th>
@@ -124,6 +136,7 @@
         {% for r in results %}
         <tr>
             <td>{{ r.domain.hostname }}</td>
+            <td><span class="badge exposure-{{ r.is_internal | exposure_class }}">{{ r.is_internal | exposure_label }}</span></td>
             <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
             <td>{{ r.http_status_code or r.error_message or "-" }}</td>
             <td><span class="badge {{ 'protected' if r.akamai_protected else 'unprotected' }}">

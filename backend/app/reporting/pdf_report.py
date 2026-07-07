@@ -10,19 +10,39 @@ from app.reporting.summary import compute_scan_summary
 
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 
+
+def _exposure_label(is_internal: bool | None) -> str:
+    if is_internal is True:
+        return "Interno"
+    if is_internal is False:
+        return "Externo"
+    return "Desconhecido"
+
+
+def _exposure_class(is_internal: bool | None) -> str:
+    if is_internal is True:
+        return "internal"
+    if is_internal is False:
+        return "external"
+    return "unknown"
+
+
 _env = Environment(
     loader=FileSystemLoader(TEMPLATES_DIR),
     autoescape=select_autoescape(["html"]),
 )
+_env.filters["exposure_label"] = _exposure_label
+_env.filters["exposure_class"] = _exposure_class
 
 
 def _donut_segments(summary: dict) -> list[dict]:
     """Segmentos de um donut chart SVG feito à mão (stroke-dasharray/dashoffset) -
-    evita depender de uma lib de gráficos só para 3 fatias."""
+    evita depender de uma lib de gráficos só para poucas fatias."""
     segments = [
         ("Protegido (Akamai)", summary["protected"], "#10b981"),
-        ("Não protegido e online", summary["unprotected_online"], "#ef4444"),
-        ("Não protegido e offline", summary["unprotected_offline"], "#94a3b8"),
+        ("Externo e sem proteção (risco)", summary["external_unprotected_online"], "#ef4444"),
+        ("Interno e sem proteção", summary["internal_unprotected_online"], "#f59e0b"),
+        ("Offline e sem proteção", summary["unprotected_offline"], "#94a3b8"),
     ]
     total = summary["total"] or 1
     radius = 60
@@ -47,9 +67,10 @@ def _donut_segments(summary: dict) -> list[dict]:
 
 def build_pdf_report(scan_run: ScanRun, results: list[ScanResult]) -> bytes:
     summary = compute_scan_summary(results)
+    exposure_order = {False: 0, True: 1, None: 2}  # externo (risco real) primeiro
     risky = sorted(
         (r for r in results if r.status in ("ONLINE", "WARNING") and not r.akamai_protected),
-        key=lambda r: r.domain.hostname,
+        key=lambda r: (exposure_order[r.is_internal], r.domain.hostname),
     )
     sorted_results = sorted(results, key=lambda r: r.domain.hostname)
 

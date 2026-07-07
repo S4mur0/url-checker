@@ -114,7 +114,7 @@ nav.navbar {
 .view.hidden { display: none; }
 
 /* Inputs */
-textarea, input[type="text"] {
+textarea, input[type="text"], select {
     width: 100%;
     background: rgba(15, 23, 42, 0.5);
     border: 1px solid var(--panel-border);
@@ -123,8 +123,9 @@ textarea, input[type="text"] {
     padding: 0.8rem 1rem;
     font-family: inherit;
 }
+select { color-scheme: dark; }
 textarea { height: 150px; font-family: monospace; resize: vertical; margin-bottom: 1rem; }
-textarea:focus, input[type="text"]:focus {
+textarea:focus, input[type="text"]:focus, select:focus {
     outline: none;
     border-color: var(--accent);
 }
@@ -272,6 +273,9 @@ tr { animation: fadeIn 0.3s ease-out forwards; }
 .badge.OFFLINE { background: rgba(239, 68, 68, 0.2); color: var(--status-offline); }
 .badge.protected { background: rgba(16, 185, 129, 0.2); color: var(--status-online); }
 .badge.unprotected { background: rgba(239, 68, 68, 0.2); color: var(--status-offline); }
+.badge.exposure-external { background: rgba(239, 68, 68, 0.2); color: var(--status-offline); }
+.badge.exposure-internal { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); }
+.badge.exposure-unknown { background: rgba(148, 163, 184, 0.12); color: var(--text-secondary); }
 
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; gap: 1rem; flex-wrap: wrap; }
 .section-header h2 { font-size: 1.3rem; }

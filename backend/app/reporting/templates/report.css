@@ -163,6 +163,9 @@ tr:nth-child(even) td {
 .badge.OFFLINE { background: #ef4444; }
 .badge.protected { background: #10b981; }
 .badge.unprotected { background: #ef4444; }
+.badge.exposure-external { background: #ef4444; }
+.badge.exposure-internal { background: #64748b; }
+.badge.exposure-unknown { background: #cbd5e1; color: #334155; }
 
 .risk-table tr td {
     background: #fef2f2 !important;

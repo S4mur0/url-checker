@@ -3,7 +3,19 @@
 Deve ser chamada via asyncio.to_thread() a partir de código async.
 """
 
+import ipaddress
+
 import dns.resolver
+
+
+def is_internal_ip(ip: str) -> bool | None:
+    """True se o IP for de rede privada/reservada (RFC 1918, loopback, link-local,
+    CGNAT, etc - via ipaddress.is_private), False se for público/roteável na
+    internet, None se a string não for um IP válido."""
+    try:
+        return ipaddress.ip_address(ip).is_private
+    except ValueError:
+        return None
 
 
 def resolve_cname_chain(hostname: str, max_hops: int = 10, timeout: float = 5.0) -> list[str]:

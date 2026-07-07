@@ -93,6 +93,7 @@ class ScanResultOut(BaseModel):
     error_message: str | None
     response_time_ms: float | None
     resolved_ip: str | None
+    is_internal: bool | None
     akamai_protected: bool
     akamai_signals: list[str]
     cname_chain: list[str]
@@ -110,6 +111,11 @@ class ScanRunSummary(BaseModel):
     unprotected: int
     unprotected_online: int
     unprotected_offline: int
+    internal_count: int
+    external_count: int
+    unknown_exposure_count: int
+    external_unprotected_online: int
+    internal_unprotected_online: int
     pct_online: float
     pct_protected: float
 

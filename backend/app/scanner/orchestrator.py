@@ -11,7 +11,7 @@ import httpx
 
 from app.models import Domain
 from app.scanner.detector import combine_akamai_detection
-from app.scanner.dns_check import resolve_a_record, resolve_cname_chain
+from app.scanner.dns_check import is_internal_ip, resolve_a_record, resolve_cname_chain
 from app.scanner.http_check import check_domain_http
 from app.scanner.tls_check import get_tls_cert_info
 
@@ -26,6 +26,7 @@ class DomainScanResult:
     error_message: str | None
     response_time_ms: float | None
     resolved_ip: str | None
+    is_internal: bool | None
     akamai_protected: bool
     akamai_signals: list[str]
     cname_chain: list[str]
@@ -43,6 +44,7 @@ async def scan_domain(
         http_result = await check_domain_http(client, domain.hostname)
         cname_chain = await asyncio.to_thread(resolve_cname_chain, domain.hostname)
         resolved_ip = await asyncio.to_thread(resolve_a_record, domain.hostname)
+        is_internal = is_internal_ip(resolved_ip) if resolved_ip else None
 
         protected, signals = combine_akamai_detection(
             http_result.headers, http_result.cookie_names, cname_chain
@@ -61,6 +63,7 @@ async def scan_domain(
             error_message=http_result.error_message,
             response_time_ms=http_result.response_time_ms,
             resolved_ip=resolved_ip,
+            is_internal=is_internal,
             akamai_protected=protected,
             akamai_signals=signals,
             cname_chain=cname_chain,

@@ -52,6 +52,7 @@ class ScanResult(Base):
     error_message: Mapped[str | None] = mapped_column(String(255), nullable=True)
     response_time_ms: Mapped[float | None] = mapped_column(Float, nullable=True)
     resolved_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    is_internal: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     akamai_protected: Mapped[bool] = mapped_column(Boolean, default=False)
     akamai_signals: Mapped[list] = mapped_column(JSON, default=list)

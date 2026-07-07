@@ -1,6 +1,13 @@
 import { useState, useCallback } from 'react';
 
-const INITIAL_COUNTS = { ONLINE: 0, WARNING: 0, OFFLINE: 0, PROTECTED: 0, UNPROTECTED: 0 };
+const INITIAL_COUNTS = {
+  ONLINE: 0,
+  WARNING: 0,
+  OFFLINE: 0,
+  PROTECTED: 0,
+  UNPROTECTED: 0,
+  EXTERNAL_UNPROTECTED: 0,
+};
 const LIVE_TABLE_LIMIT = 200;
 
 export function useScanStream() {
@@ -59,11 +66,17 @@ export function useScanStream() {
           // milhares de domínios, manter todos no DOM trava o navegador. O total
           // real fica sempre correto no scan run persistido (ver Relatórios).
           setResults((prev) => [payload, ...prev].slice(0, LIVE_TABLE_LIMIT));
+          const isExternalUnprotected =
+            (payload.status === 'ONLINE' || payload.status === 'WARNING') &&
+            !payload.akamai_protected &&
+            payload.is_internal === false;
+
           setCounts((prev) => ({
             ...prev,
             [payload.status]: prev[payload.status] + 1,
             PROTECTED: prev.PROTECTED + (payload.akamai_protected ? 1 : 0),
             UNPROTECTED: prev.UNPROTECTED + (payload.akamai_protected ? 0 : 1),
+            EXTERNAL_UNPROTECTED: prev.EXTERNAL_UNPROTECTED + (isExternalUnprotected ? 1 : 0),
           }));
         }
       }

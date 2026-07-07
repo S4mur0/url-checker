@@ -15,7 +15,7 @@ export default function ScanRunList({ runs }) {
             <th>Domínios</th>
             <th>Online</th>
             <th>Protegidos</th>
-            <th>Risco (sem proteção e online)</th>
+            <th>Risco real (externo, sem proteção)</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -29,8 +29,8 @@ export default function ScanRunList({ runs }) {
               <td>{run.summary ? `${run.summary.pct_online}%` : '—'}</td>
               <td>{run.summary ? `${run.summary.protected} (${run.summary.pct_protected}%)` : '—'}</td>
               <td>
-                {run.summary && run.summary.unprotected_online > 0 ? (
-                  <span className="badge unprotected">{run.summary.unprotected_online}</span>
+                {run.summary && run.summary.external_unprotected_online > 0 ? (
+                  <span className="badge unprotected">{run.summary.external_unprotected_online}</span>
                 ) : (
                   '0'
                 )}

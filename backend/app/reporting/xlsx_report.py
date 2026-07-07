@@ -12,6 +12,7 @@ from app.reporting.summary import compute_scan_summary
 GREEN = "10B981"
 AMBER = "F59E0B"
 RED = "EF4444"
+GRAY = "94A3B8"
 HEADER_BG = "1E293B"
 
 STATUS_FILL = {
@@ -21,8 +22,26 @@ STATUS_FILL = {
 }
 PROTECTED_FILL = PatternFill("solid", fgColor=GREEN)
 UNPROTECTED_FILL = PatternFill("solid", fgColor=RED)
+EXTERNAL_FILL = PatternFill("solid", fgColor=RED)
+INTERNAL_FILL = PatternFill("solid", fgColor=GRAY)
 HEADER_FILL = PatternFill("solid", fgColor=HEADER_BG)
 HEADER_FONT = Font(color="FFFFFF", bold=True)
+
+
+def _exposure_label(r: ScanResult) -> str:
+    if r.is_internal is True:
+        return "Interno"
+    if r.is_internal is False:
+        return "Externo"
+    return "Desconhecido"
+
+
+def _exposure_fill(r: ScanResult) -> PatternFill | None:
+    if r.is_internal is True:
+        return INTERNAL_FILL
+    if r.is_internal is False:
+        return EXTERNAL_FILL
+    return None
 
 
 def _style_header_row(ws: Worksheet, row: int, ncols: int) -> None:
@@ -55,8 +74,11 @@ def _build_summary_sheet(wb: Workbook, scan_run: ScanRun, summary: dict) -> None
         ("% Online", f"{summary['pct_online']}%"),
         ("Protegidos por Akamai", summary["protected"]),
         ("% Cobertura WAF", f"{summary['pct_protected']}%"),
-        ("Não protegidos e online (risco prioritário)", summary["unprotected_online"]),
-        ("Não protegidos e offline", summary["unprotected_offline"]),
+        ("Domínios expostos externamente", summary["external_count"]),
+        ("Domínios apenas internos (IP privado)", summary["internal_count"]),
+        ("Exposição desconhecida (DNS não resolvido)", summary["unknown_exposure_count"]),
+        ("EXTERNO, online e sem proteção (risco real)", summary["external_unprotected_online"]),
+        ("Interno, online e sem proteção (risco baixo)", summary["internal_unprotected_online"]),
     ]
 
     start_row = 4
@@ -67,45 +89,53 @@ def _build_summary_sheet(wb: Workbook, scan_run: ScanRun, summary: dict) -> None
     for i, (label, value) in enumerate(metrics, start=start_row + 1):
         ws.cell(row=i, column=1, value=label)
         cell = ws.cell(row=i, column=2, value=value)
-        if label.startswith("Não protegidos e online"):
+        if label.startswith("EXTERNO"):
             cell.fill = UNPROTECTED_FILL
             cell.font = Font(bold=True, color="FFFFFF")
+        elif label.startswith("Interno, online"):
+            cell.fill = INTERNAL_FILL
+            cell.font = Font(bold=True, color="FFFFFF")
 
-    _autosize_columns(ws, [42, 14])
+    _autosize_columns(ws, [46, 14])
 
     chart_start = start_row + len(metrics) + 3
     ws.cell(row=chart_start, column=1, value="Categoria")
     ws.cell(row=chart_start, column=2, value="Domínios")
     ws.cell(row=chart_start + 1, column=1, value="Protegido (Akamai)")
     ws.cell(row=chart_start + 1, column=2, value=summary["protected"])
-    ws.cell(row=chart_start + 2, column=1, value="Não protegido e online")
-    ws.cell(row=chart_start + 2, column=2, value=summary["unprotected_online"])
-    ws.cell(row=chart_start + 3, column=1, value="Não protegido e offline")
-    ws.cell(row=chart_start + 3, column=2, value=summary["unprotected_offline"])
+    ws.cell(row=chart_start + 2, column=1, value="Externo e sem proteção (risco)")
+    ws.cell(row=chart_start + 2, column=2, value=summary["external_unprotected_online"])
+    ws.cell(row=chart_start + 3, column=1, value="Interno e sem proteção")
+    ws.cell(row=chart_start + 3, column=2, value=summary["internal_unprotected_online"])
+    ws.cell(row=chart_start + 4, column=1, value="Offline e sem proteção")
+    ws.cell(row=chart_start + 4, column=2, value=summary["unprotected_offline"])
 
     chart = PieChart()
-    chart.title = "Cobertura WAF"
-    data = Reference(ws, min_col=2, min_row=chart_start, max_row=chart_start + 3)
-    categories = Reference(ws, min_col=1, min_row=chart_start + 1, max_row=chart_start + 3)
+    chart.title = "Cobertura WAF x Exposição"
+    data = Reference(ws, min_col=2, min_row=chart_start, max_row=chart_start + 4)
+    categories = Reference(ws, min_col=1, min_row=chart_start + 1, max_row=chart_start + 4)
     chart.add_data(data, titles_from_data=True)
     chart.set_categories(categories)
-    chart.height = 8
-    chart.width = 12
+    chart.height = 9
+    chart.width = 13
     ws.add_chart(chart, f"D{start_row}")
 
 
 def _build_risk_sheet(wb: Workbook, results: list[ScanResult]) -> None:
     ws = wb.create_sheet("Risco - Sem Proteção")
-    headers = ["Hostname", "URL Verificada", "Status", "Código HTTP", "IP Resolvido", "Verificado em"]
+    headers = ["Hostname", "Exposição", "URL Verificada", "Status", "Código HTTP", "IP Resolvido", "Verificado em"]
     ws.append(headers)
     _style_header_row(ws, 1, len(headers))
 
     risky = [r for r in results if r.status in ("ONLINE", "WARNING") and not r.akamai_protected]
-    risky.sort(key=lambda r: r.domain.hostname)
+    # Externo primeiro (risco real), depois interno, depois exposição desconhecida
+    exposure_order = {False: 0, True: 1, None: 2}
+    risky.sort(key=lambda r: (exposure_order[r.is_internal], r.domain.hostname))
 
     for r in risky:
         row = [
             r.domain.hostname,
+            _exposure_label(r),
             r.checked_url,
             r.status,
             r.http_status_code,
@@ -113,17 +143,22 @@ def _build_risk_sheet(wb: Workbook, results: list[ScanResult]) -> None:
             r.checked_at.strftime("%d/%m/%Y %H:%M"),
         ]
         ws.append(row)
-        ws.cell(row=ws.max_row, column=3).fill = STATUS_FILL[r.status]
+        line = ws.max_row
+        ws.cell(row=line, column=4).fill = STATUS_FILL[r.status]
+        exposure_fill = _exposure_fill(r)
+        if exposure_fill:
+            ws.cell(row=line, column=2).fill = exposure_fill
+            ws.cell(row=line, column=2).font = Font(color="FFFFFF", bold=True)
 
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
-    _autosize_columns(ws, [32, 40, 12, 12, 16, 18])
+    _autosize_columns(ws, [32, 14, 40, 12, 12, 16, 18])
 
 
 def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
     ws = wb.create_sheet("Detalhado")
     headers = [
-        "Hostname", "URL Verificada", "Status", "Código HTTP", "Erro",
+        "Hostname", "Exposição", "URL Verificada", "Status", "Código HTTP", "Erro",
         "Tempo Resposta (ms)", "IP Resolvido", "Protegido Akamai", "Sinais Akamai",
         "Cadeia CNAME", "TLS Issuer", "TLS Expira em", "Verificado em",
     ]
@@ -133,6 +168,7 @@ def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
     for r in sorted(results, key=lambda r: r.domain.hostname):
         row = [
             r.domain.hostname,
+            _exposure_label(r),
             r.checked_url,
             r.status,
             r.http_status_code,
@@ -148,12 +184,16 @@ def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
         ]
         ws.append(row)
         line = ws.max_row
-        ws.cell(row=line, column=3).fill = STATUS_FILL[r.status]
-        ws.cell(row=line, column=8).fill = PROTECTED_FILL if r.akamai_protected else UNPROTECTED_FILL
+        ws.cell(row=line, column=4).fill = STATUS_FILL[r.status]
+        exposure_fill = _exposure_fill(r)
+        if exposure_fill:
+            ws.cell(row=line, column=2).fill = exposure_fill
+            ws.cell(row=line, column=2).font = Font(color="FFFFFF", bold=True)
+        ws.cell(row=line, column=9).fill = PROTECTED_FILL if r.akamai_protected else UNPROTECTED_FILL
 
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
-    _autosize_columns(ws, [32, 40, 10, 12, 20, 16, 16, 14, 40, 40, 24, 14, 18])
+    _autosize_columns(ws, [32, 14, 40, 10, 12, 20, 16, 16, 14, 40, 40, 24, 14, 18])
 
 
 def build_xlsx_report(scan_run: ScanRun, results: list[ScanResult]) -> io.BytesIO:
