@@ -1,0 +1,3 @@
+example.com
+google.com
+http://site-inexistente-123456.com.br
