@@ -1,0 +1,14 @@
+{
+  "name": "waf-auditor",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Auditor de Cobertura WAF (Akamai) - orquestra backend (FastAPI) e frontend (Vite) juntos",
+  "scripts": {
+    "start": "concurrently -n backend,frontend -c blue,green \"npm:start:backend\" \"npm:start:frontend\"",
+    "start:backend": "cd backend && venv/bin/uvicorn app.main:app --port 8000",
+    "start:frontend": "cd frontend && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

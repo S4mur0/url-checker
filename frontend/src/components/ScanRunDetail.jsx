@@ -8,7 +8,7 @@ import Pagination from './Pagination';
 const PAGE_SIZE = 100;
 const EXPOSURE_ORDER = { false: 0, true: 1, null: 2 };
 
-export default function ScanRunDetail({ run }) {
+export default function ScanRunDetail({ run, projectId }) {
   const { summary, results } = run;
   const risky = useMemo(
     () =>
@@ -57,8 +57,8 @@ export default function ScanRunDetail({ run }) {
           <p className="muted">{new Date(run.started_at).toLocaleString('pt-BR')}</p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <a className="export-btn" href={api.xlsxReportUrl(run.id)}>Exportar XLSX</a>
-          <a className="export-btn" href={api.pdfReportUrl(run.id)}>Exportar PDF</a>
+          <a className="export-btn" href={api.xlsxReportUrl(projectId, run.id)}>Exportar XLSX</a>
+          <a className="export-btn" href={api.pdfReportUrl(projectId, run.id)}>Exportar PDF</a>
         </div>
       </div>
 
@@ -105,12 +105,12 @@ export default function ScanRunDetail({ run }) {
               <tbody>
                 {riskPageItems.map((r) => (
                   <tr key={r.id}>
-                    <td>{r.hostname}</td>
+                    <td className="cell-mono">{r.hostname}</td>
                     <td><ExposureBadge isInternal={r.is_internal} /></td>
-                    <td className="muted">{r.checked_url}</td>
+                    <td className="cell-muted">{r.checked_url}</td>
                     <td><StatusBadge status={r.status} /></td>
-                    <td>{r.http_status_code || '—'}</td>
-                    <td className="muted">{r.resolved_ip || '—'}</td>
+                    <td className="cell-muted">{r.http_status_code || '—'}</td>
+                    <td className="cell-muted">{r.resolved_ip || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -156,14 +156,14 @@ export default function ScanRunDetail({ run }) {
           <tbody>
             {pageItems.map((r) => (
               <tr key={r.id}>
-                <td>{r.hostname}</td>
+                <td className="cell-mono">{r.hostname}</td>
                 <td><StatusBadge status={r.status} /></td>
-                <td>{r.status === 'OFFLINE' ? r.error_message : r.http_status_code}</td>
+                <td className="cell-muted">{r.status === 'OFFLINE' ? r.error_message : r.http_status_code}</td>
                 <td><AkamaiBadge protected={r.akamai_protected} /></td>
                 <td><ExposureBadge isInternal={r.is_internal} /></td>
-                <td className="muted">{r.akamai_signals.join(', ') || '—'}</td>
-                <td className="muted">{r.resolved_ip || '—'}</td>
-                <td className="muted">{new Date(r.checked_at).toLocaleString('pt-BR')}</td>
+                <td className="cell-muted">{r.akamai_signals.join(', ') || '—'}</td>
+                <td className="cell-muted">{r.resolved_ip || '—'}</td>
+                <td className="cell-muted">{new Date(r.checked_at).toLocaleString('pt-BR')}</td>
               </tr>
             ))}
           </tbody>

@@ -20,18 +20,31 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  listDomains: () => request('/domains'),
-  createDomain: (payload) => request('/domains', { method: 'POST', body: JSON.stringify(payload) }),
-  bulkCreateDomains: (text) => request('/domains/bulk', { method: 'POST', body: JSON.stringify({ text }) }),
-  bulkCreateDomainItems: (items) => request('/domains/bulk-items', { method: 'POST', body: JSON.stringify({ items }) }),
-  updateDomain: (id, payload) => request(`/domains/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
-  deleteDomain: (id, hard = false) => request(`/domains/${id}${hard ? '?hard=true' : ''}`, { method: 'DELETE' }),
-  bulkDeleteDomains: (domainIds, hard = true) =>
-    request('/domains/bulk-delete', { method: 'POST', body: JSON.stringify({ domain_ids: domainIds, hard }) }),
+  listProjects: () => request('/projects'),
+  createProject: (payload) => request('/projects', { method: 'POST', body: JSON.stringify(payload) }),
+  updateProject: (id, payload) => request(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteProject: (id) => request(`/projects/${id}`, { method: 'DELETE' }),
 
-  listScanRuns: () => request('/scan-runs'),
-  getScanRun: (id) => request(`/scan-runs/${id}`),
+  listDomains: (projectId) => request(`/projects/${projectId}/domains`),
+  createDomain: (projectId, payload) =>
+    request(`/projects/${projectId}/domains`, { method: 'POST', body: JSON.stringify(payload) }),
+  bulkCreateDomains: (projectId, text) =>
+    request(`/projects/${projectId}/domains/bulk`, { method: 'POST', body: JSON.stringify({ text }) }),
+  bulkCreateDomainItems: (projectId, items) =>
+    request(`/projects/${projectId}/domains/bulk-items`, { method: 'POST', body: JSON.stringify({ items }) }),
+  updateDomain: (projectId, id, payload) =>
+    request(`/projects/${projectId}/domains/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
+  deleteDomain: (projectId, id, hard = false) =>
+    request(`/projects/${projectId}/domains/${id}${hard ? '?hard=true' : ''}`, { method: 'DELETE' }),
+  bulkDeleteDomains: (projectId, domainIds, hard = true) =>
+    request(`/projects/${projectId}/domains/bulk-delete`, {
+      method: 'POST',
+      body: JSON.stringify({ domain_ids: domainIds, hard }),
+    }),
 
-  xlsxReportUrl: (id) => `${BASE}/scan-runs/${id}/report.xlsx`,
-  pdfReportUrl: (id) => `${BASE}/scan-runs/${id}/report.pdf`,
+  listScanRuns: (projectId) => request(`/projects/${projectId}/scan-runs`),
+  getScanRun: (projectId, id) => request(`/projects/${projectId}/scan-runs/${id}`),
+
+  xlsxReportUrl: (projectId, id) => `${BASE}/projects/${projectId}/scan-runs/${id}/report.xlsx`,
+  pdfReportUrl: (projectId, id) => `${BASE}/projects/${projectId}/scan-runs/${id}/report.pdf`,
 };

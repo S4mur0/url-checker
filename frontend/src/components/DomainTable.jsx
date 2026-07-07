@@ -47,7 +47,7 @@ export default function DomainTable({ domains, selected, onToggleSelect, onUpdat
                   onChange={() => onToggleSelect(domain.id)}
                 />
               </td>
-              <td>{domain.hostname}</td>
+              <td className="cell-mono">{domain.hostname}</td>
               <td>
                 {editingId === domain.id ? (
                   <input

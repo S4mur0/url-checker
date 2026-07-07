@@ -3,7 +3,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Domain
+from app.deps import get_project_or_404
+from app.models import Domain, Project
 from app.schemas import (
     DomainBulkCreate,
     DomainBulkDelete,
@@ -14,13 +15,16 @@ from app.schemas import (
     normalize_hostname,
 )
 
-router = APIRouter(prefix="/api/domains", tags=["domains"])
+router = APIRouter(prefix="/api/projects/{project_id}/domains", tags=["domains"])
 
 
-def _bulk_insert(db: Session, rows: list[tuple[str, str | None]]) -> dict:
+def _bulk_insert(db: Session, project_id: int, rows: list[tuple[str, str | None]]) -> dict:
     """rows: lista de (hostname_bruto, notes_opcional). Normaliza, deduplica contra o
-    banco e dentro do próprio lote, e insere tudo numa única transação."""
-    existing_hosts = {h for (h,) in db.execute(select(Domain.hostname))}
+    banco (escopado ao projeto) e dentro do próprio lote, e insere tudo numa única
+    transação."""
+    existing_hosts = {
+        h for (h,) in db.execute(select(Domain.hostname).where(Domain.project_id == project_id))
+    }
 
     created: list[str] = []
     skipped: list[str] = []
@@ -36,7 +40,7 @@ def _bulk_insert(db: Session, rows: list[tuple[str, str | None]]) -> dict:
             skipped.append(raw_hostname)
             continue
         seen_in_batch.add(hostname)
-        db.add(Domain(hostname=hostname, notes=notes or None))
+        db.add(Domain(project_id=project_id, hostname=hostname, notes=notes or None))
         created.append(hostname)
 
     db.commit()
@@ -44,8 +48,12 @@ def _bulk_insert(db: Session, rows: list[tuple[str, str | None]]) -> dict:
 
 
 @router.get("", response_model=list[DomainOut])
-def list_domains(active: bool | None = None, db: Session = Depends(get_db)):
-    stmt = select(Domain)
+def list_domains(
+    active: bool | None = None,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    stmt = select(Domain).where(Domain.project_id == project.id)
     if active is not None:
         stmt = stmt.where(Domain.active == active)
     stmt = stmt.order_by(Domain.hostname)
@@ -53,11 +61,17 @@ def list_domains(active: bool | None = None, db: Session = Depends(get_db)):
 
 
 @router.post("", response_model=DomainOut, status_code=201)
-def create_domain(payload: DomainCreate, db: Session = Depends(get_db)):
-    existing = db.execute(select(Domain).where(Domain.hostname == payload.hostname)).scalar_one_or_none()
+def create_domain(
+    payload: DomainCreate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    existing = db.execute(
+        select(Domain).where(Domain.project_id == project.id, Domain.hostname == payload.hostname)
+    ).scalar_one_or_none()
     if existing:
-        raise HTTPException(status_code=409, detail="Domínio já cadastrado")
-    domain = Domain(hostname=payload.hostname, notes=payload.notes)
+        raise HTTPException(status_code=409, detail="Domínio já cadastrado neste projeto")
+    domain = Domain(project_id=project.id, hostname=payload.hostname, notes=payload.notes)
     db.add(domain)
     db.commit()
     db.refresh(domain)
@@ -65,35 +79,54 @@ def create_domain(payload: DomainCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/bulk")
-def bulk_create_domains(payload: DomainBulkCreate, db: Session = Depends(get_db)):
+def bulk_create_domains(
+    payload: DomainBulkCreate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
     lines = [line.strip() for line in payload.text.splitlines() if line.strip()]
-    return _bulk_insert(db, [(line, None) for line in lines])
+    return _bulk_insert(db, project.id, [(line, None) for line in lines])
 
 
 @router.post("/bulk-items")
-def bulk_create_domain_items(payload: DomainBulkItemsCreate, db: Session = Depends(get_db)):
+def bulk_create_domain_items(
+    payload: DomainBulkItemsCreate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
     rows = [(item.hostname, item.notes) for item in payload.items if item.hostname.strip()]
-    return _bulk_insert(db, rows)
+    return _bulk_insert(db, project.id, rows)
 
 
 @router.get("/{domain_id}", response_model=DomainOut)
-def get_domain(domain_id: int, db: Session = Depends(get_db)):
+def get_domain(
+    domain_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
     domain = db.get(Domain, domain_id)
-    if not domain:
+    if not domain or domain.project_id != project.id:
         raise HTTPException(status_code=404, detail="Domínio não encontrado")
     return domain
 
 
 @router.put("/{domain_id}", response_model=DomainOut)
-def update_domain(domain_id: int, payload: DomainUpdate, db: Session = Depends(get_db)):
+def update_domain(
+    domain_id: int,
+    payload: DomainUpdate,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
     domain = db.get(Domain, domain_id)
-    if not domain:
+    if not domain or domain.project_id != project.id:
         raise HTTPException(status_code=404, detail="Domínio não encontrado")
 
     if payload.hostname is not None and payload.hostname != domain.hostname:
-        existing = db.execute(select(Domain).where(Domain.hostname == payload.hostname)).scalar_one_or_none()
+        existing = db.execute(
+            select(Domain).where(Domain.project_id == project.id, Domain.hostname == payload.hostname)
+        ).scalar_one_or_none()
         if existing:
-            raise HTTPException(status_code=409, detail="Domínio já cadastrado")
+            raise HTTPException(status_code=409, detail="Domínio já cadastrado neste projeto")
         domain.hostname = payload.hostname
 
     if payload.notes is not None:
@@ -107,9 +140,14 @@ def update_domain(domain_id: int, payload: DomainUpdate, db: Session = Depends(g
 
 
 @router.delete("/{domain_id}", status_code=204)
-def delete_domain(domain_id: int, hard: bool = False, db: Session = Depends(get_db)):
+def delete_domain(
+    domain_id: int,
+    hard: bool = False,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
     domain = db.get(Domain, domain_id)
-    if not domain:
+    if not domain or domain.project_id != project.id:
         raise HTTPException(status_code=404, detail="Domínio não encontrado")
 
     if hard:
@@ -120,8 +158,14 @@ def delete_domain(domain_id: int, hard: bool = False, db: Session = Depends(get_
 
 
 @router.post("/bulk-delete")
-def bulk_delete_domains(payload: DomainBulkDelete, db: Session = Depends(get_db)):
-    domains = db.execute(select(Domain).where(Domain.id.in_(payload.domain_ids))).scalars().all()
+def bulk_delete_domains(
+    payload: DomainBulkDelete,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    domains = db.execute(
+        select(Domain).where(Domain.id.in_(payload.domain_ids), Domain.project_id == project.id)
+    ).scalars().all()
 
     if payload.hard:
         for domain in domains:

@@ -7,7 +7,7 @@ import Pagination from '../components/Pagination';
 
 const PAGE_SIZE = 50;
 
-export default function DomainsPage() {
+export default function DomainsPage({ projectId }) {
   const [domains, setDomains] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showBulkModal, setShowBulkModal] = useState(false);
@@ -19,7 +19,7 @@ export default function DomainsPage() {
   async function loadDomains() {
     setLoading(true);
     try {
-      const data = await api.listDomains();
+      const data = await api.listDomains(projectId);
       setDomains(data);
     } catch (err) {
       setError(err.message);
@@ -30,37 +30,37 @@ export default function DomainsPage() {
 
   useEffect(() => {
     loadDomains();
-  }, []);
+  }, [projectId]);
 
   async function handleCreate(payload) {
-    await api.createDomain(payload);
+    await api.createDomain(projectId, payload);
     await loadDomains();
   }
 
   async function handleBulkCreate(text) {
-    const result = await api.bulkCreateDomains(text);
+    const result = await api.bulkCreateDomains(projectId, text);
     await loadDomains();
     return result;
   }
 
   async function handleBulkCreateItems(items) {
-    const result = await api.bulkCreateDomainItems(items);
+    const result = await api.bulkCreateDomainItems(projectId, items);
     await loadDomains();
     return result;
   }
 
   async function handleUpdate(id, payload) {
-    await api.updateDomain(id, payload);
+    await api.updateDomain(projectId, id, payload);
     await loadDomains();
   }
 
   async function handleDelete(id) {
-    await api.deleteDomain(id);
+    await api.deleteDomain(projectId, id);
     await loadDomains();
   }
 
   async function handleHardDelete(id) {
-    await api.deleteDomain(id, true);
+    await api.deleteDomain(projectId, id, true);
     setSelected((prev) => {
       const next = new Set(prev);
       next.delete(id);
@@ -75,7 +75,7 @@ export default function DomainsPage() {
       `Excluir permanentemente ${selected.size} domínio(s) selecionado(s)? Isso também apaga o histórico de scans desses domínios.`
     );
     if (!confirmed) return;
-    await api.bulkDeleteDomains([...selected], true);
+    await api.bulkDeleteDomains(projectId, [...selected], true);
     setSelected(new Set());
     await loadDomains();
   }
@@ -116,7 +116,7 @@ export default function DomainsPage() {
   }
 
   return (
-    <div className="glass-panel">
+    <div className="panel">
       <div className="section-header">
         <div>
           <h2>Domínios</h2>

@@ -2,6 +2,66 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.models import PROJECT_COLOR_PALETTE
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: str | None = None
+    color: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("nome vazio")
+        return value
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, value: str | None) -> str | None:
+        if value is not None and value not in PROJECT_COLOR_PALETTE:
+            raise ValueError("cor fora da paleta permitida")
+        return value
+
+
+class ProjectUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    color: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("nome vazio")
+        return value
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, value: str | None) -> str | None:
+        if value is not None and value not in PROJECT_COLOR_PALETTE:
+            raise ValueError("cor fora da paleta permitida")
+        return value
+
+
+class ProjectOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    description: str | None
+    color: str
+    created_at: datetime
+    updated_at: datetime
+    domain_count: int = 0
+    active_domain_count: int = 0
+    last_scan_at: datetime | None = None
+
 
 def normalize_hostname(value: str) -> str:
     value = value.strip()

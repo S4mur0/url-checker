@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-export default function ScanRunList({ runs }) {
+export default function ScanRunList({ runs, projectId }) {
   if (runs.length === 0) {
     return <p className="empty-state">Nenhum scan executado ainda. Vá em Scan para rodar o primeiro.</p>;
   }
@@ -23,7 +23,7 @@ export default function ScanRunList({ runs }) {
         <tbody>
           {runs.map((run) => (
             <tr key={run.id}>
-              <td>#{run.id}</td>
+              <td className="cell-mono">#{run.id}</td>
               <td className="muted">{new Date(run.started_at).toLocaleString('pt-BR')}</td>
               <td>{run.total_domains}</td>
               <td>{run.summary ? `${run.summary.pct_online}%` : '—'}</td>
@@ -37,7 +37,7 @@ export default function ScanRunList({ runs }) {
               </td>
               <td className="muted">{run.status === 'completed' ? 'Concluído' : 'Em execução'}</td>
               <td>
-                <Link className="link-btn" to={`/reports/${run.id}`}>Ver relatório</Link>
+                <Link className="link-btn" to={`/p/${projectId}/reports/${run.id}`}>Ver relatório</Link>
               </td>
             </tr>
           ))}

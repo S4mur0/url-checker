@@ -57,11 +57,11 @@ def _autosize_columns(ws: Worksheet, widths: list[int]) -> None:
         ws.column_dimensions[get_column_letter(idx)].width = width
 
 
-def _build_summary_sheet(wb: Workbook, scan_run: ScanRun, summary: dict) -> None:
+def _build_summary_sheet(wb: Workbook, scan_run: ScanRun, summary: dict, project_name: str) -> None:
     ws = wb.active
     ws.title = "Resumo"
 
-    ws["A1"] = "Relatório Executivo — Cobertura WAF (Akamai)"
+    ws["A1"] = f"Relatório Executivo — Cobertura WAF (Akamai) — {project_name}"
     ws["A1"].font = Font(size=16, bold=True)
     ws["A2"] = f"Scan run #{scan_run.id}  ·  {scan_run.started_at:%d/%m/%Y %H:%M}"
     ws["A2"].font = Font(italic=True, color="64748B")
@@ -196,10 +196,10 @@ def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
     _autosize_columns(ws, [32, 14, 40, 10, 12, 20, 16, 16, 14, 40, 40, 24, 14, 18])
 
 
-def build_xlsx_report(scan_run: ScanRun, results: list[ScanResult]) -> io.BytesIO:
+def build_xlsx_report(scan_run: ScanRun, results: list[ScanResult], project_name: str = "") -> io.BytesIO:
     summary = compute_scan_summary(results)
     wb = Workbook()
-    _build_summary_sheet(wb, scan_run, summary)
+    _build_summary_sheet(wb, scan_run, summary, project_name)
     _build_risk_sheet(wb, results)
     _build_detail_sheet(wb, results)
 

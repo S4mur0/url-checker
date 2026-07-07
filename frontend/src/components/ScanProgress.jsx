@@ -49,13 +49,13 @@ export default function ScanProgress({ results, completedCount, counts, total, i
           <tbody>
             {results.map((r) => (
               <tr key={r.id}>
-                <td>{r.hostname}</td>
+                <td className="cell-mono">{r.hostname}</td>
                 <td><StatusBadge status={r.status} /></td>
-                <td>{r.status === 'OFFLINE' ? r.error_message : r.http_status_code}</td>
+                <td className="cell-muted">{r.status === 'OFFLINE' ? r.error_message : r.http_status_code}</td>
                 <td><AkamaiBadge protected={r.akamai_protected} /></td>
                 <td><ExposureBadge isInternal={r.is_internal} /></td>
-                <td className="muted">{r.resolved_ip || '—'}</td>
-                <td className="muted">{r.response_time_ms ? Math.round(r.response_time_ms) : '—'}</td>
+                <td className="cell-muted">{r.resolved_ip || '—'}</td>
+                <td className="cell-muted">{r.response_time_ms ? Math.round(r.response_time_ms) : '—'}</td>
               </tr>
             ))}
           </tbody>

@@ -1,0 +1,18 @@
+[Unit]
+Description=Auditor de Cobertura WAF (Akamai) - backend + frontend
+After=network.target
+
+[Service]
+Type=simple
+User=__APP_USER__
+WorkingDirectory=__APP_DIR__
+Environment=PATH=__NODE_BIN_DIR__:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=__NPM_BIN__ start
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=waf-auditor
+
+[Install]
+WantedBy=multi-user.target

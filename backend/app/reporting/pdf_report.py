@@ -65,7 +65,7 @@ def _donut_segments(summary: dict) -> list[dict]:
     return out
 
 
-def build_pdf_report(scan_run: ScanRun, results: list[ScanResult]) -> bytes:
+def build_pdf_report(scan_run: ScanRun, results: list[ScanResult], project_name: str = "") -> bytes:
     summary = compute_scan_summary(results)
     exposure_order = {False: 0, True: 1, None: 2}  # externo (risco real) primeiro
     risky = sorted(
@@ -81,6 +81,7 @@ def build_pdf_report(scan_run: ScanRun, results: list[ScanResult]) -> bytes:
         risky=risky,
         results=sorted_results,
         donut_segments=_donut_segments(summary),
+        project_name=project_name,
         generated_at=datetime.now(timezone.utc),
     )
 

@@ -18,7 +18,7 @@ export function useScanStream() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState(null);
 
-  const startScan = useCallback(async (domainIds, options = {}) => {
+  const startScan = useCallback(async (projectId, domainIds, options = {}) => {
     setResults([]);
     setCompletedCount(0);
     setCounts(INITIAL_COUNTS);
@@ -27,7 +27,7 @@ export function useScanStream() {
     setIsRunning(true);
 
     try {
-      const response = await fetch('/api/scan-runs/stream', {
+      const response = await fetch(`/api/projects/${projectId}/scan-runs/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

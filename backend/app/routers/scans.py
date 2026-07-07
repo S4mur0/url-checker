@@ -8,13 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.database import SessionLocal, get_db
-from app.models import Domain, ScanResult, ScanRun
+from app.deps import get_project_or_404
+from app.models import Domain, Project, ScanResult, ScanRun
 from app.reporting.summary import compute_scan_summary
 from app.schemas import ScanResultOut, ScanRunDetailOut, ScanRunOut, ScanRunTrigger
 
 from app.scanner.orchestrator import run_scan
 
-router = APIRouter(prefix="/api/scan-runs", tags=["scans"])
+router = APIRouter(prefix="/api/projects/{project_id}/scan-runs", tags=["scans"])
 
 
 def _result_to_out(result: ScanResult) -> ScanResultOut:
@@ -38,11 +39,11 @@ def _result_to_out(result: ScanResult) -> ScanResultOut:
     )
 
 
-def get_scan_run_or_404(db: Session, run_id: int) -> ScanRun:
+def get_scan_run_or_404(db: Session, run_id: int, project_id: int) -> ScanRun:
     stmt = (
         select(ScanRun)
         .options(selectinload(ScanRun.results).selectinload(ScanResult.domain))
-        .where(ScanRun.id == run_id)
+        .where(ScanRun.id == run_id, ScanRun.project_id == project_id)
     )
     run = db.execute(stmt).scalar_one_or_none()
     if not run:
@@ -51,16 +52,22 @@ def get_scan_run_or_404(db: Session, run_id: int) -> ScanRun:
 
 
 @router.post("/stream")
-def trigger_scan_stream(payload: ScanRunTrigger, db: Session = Depends(get_db)):
+def trigger_scan_stream(
+    payload: ScanRunTrigger,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
     if payload.domain_ids:
-        stmt = select(Domain).where(Domain.id.in_(payload.domain_ids))
+        stmt = select(Domain).where(
+            Domain.id.in_(payload.domain_ids), Domain.project_id == project.id
+        )
     else:
-        stmt = select(Domain).where(Domain.active == True)  # noqa: E712
+        stmt = select(Domain).where(Domain.active == True, Domain.project_id == project.id)  # noqa: E712
     domains = db.execute(stmt).scalars().all()
     if not domains:
         raise HTTPException(status_code=400, detail="Nenhum domínio para escanear")
 
-    scan_run = ScanRun(status="running", total_domains=len(domains))
+    scan_run = ScanRun(project_id=project.id, status="running", total_domains=len(domains))
     db.add(scan_run)
     db.commit()
     db.refresh(scan_run)
@@ -127,10 +134,11 @@ def trigger_scan_stream(payload: ScanRunTrigger, db: Session = Depends(get_db)):
 
 
 @router.get("", response_model=list[ScanRunOut])
-def list_scan_runs(db: Session = Depends(get_db)):
+def list_scan_runs(project: Project = Depends(get_project_or_404), db: Session = Depends(get_db)):
     stmt = (
         select(ScanRun)
         .options(selectinload(ScanRun.results))
+        .where(ScanRun.project_id == project.id)
         .order_by(ScanRun.started_at.desc())
     )
     runs = db.execute(stmt).scalars().all()
@@ -148,8 +156,12 @@ def list_scan_runs(db: Session = Depends(get_db)):
 
 
 @router.get("/{run_id}", response_model=ScanRunDetailOut)
-def get_scan_run(run_id: int, db: Session = Depends(get_db)):
-    run = get_scan_run_or_404(db, run_id)
+def get_scan_run(
+    run_id: int,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    run = get_scan_run_or_404(db, run_id, project.id)
     return ScanRunDetailOut(
         id=run.id,
         started_at=run.started_at,

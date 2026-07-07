@@ -7,7 +7,7 @@
 <body>
 
 <div class="report-header">
-    <h1>Relatório Executivo — Cobertura WAF (Akamai)</h1>
+    <h1>Relatório Executivo — Cobertura WAF (Akamai){% if project_name %} — {{ project_name }}{% endif %}</h1>
     <div class="meta">
         Scan run #{{ scan_run.id }} · Executado em {{ scan_run.started_at.strftime("%d/%m/%Y %H:%M") }}
         · Gerado em {{ generated_at.strftime("%d/%m/%Y %H:%M UTC") }}

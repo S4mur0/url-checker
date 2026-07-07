@@ -3,8 +3,10 @@ backend/__pycache__/
 backend/app/__pycache__/
 backend/app/**/__pycache__/
 backend/url_checker.db
+backend/url_checker.db.bak*
 frontend/node_modules/
 frontend/dist/
+node_modules/
 *.pyc
 venv/
 __pycache__/

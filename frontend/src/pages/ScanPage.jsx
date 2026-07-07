@@ -7,7 +7,7 @@ import Pagination from '../components/Pagination';
 
 const PAGE_SIZE = 100;
 
-export default function ScanPage() {
+export default function ScanPage({ projectId }) {
   const [domains, setDomains] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -20,13 +20,13 @@ export default function ScanPage() {
   const { results, completedCount, counts, runId, isRunning, error, startScan } = useScanStream();
 
   useEffect(() => {
-    api.listDomains().then((data) => {
+    api.listDomains(projectId).then((data) => {
       const active = data.filter((d) => d.active);
       setDomains(active);
       setSelected(new Set(active.map((d) => d.id)));
       setLoading(false);
     });
-  }, []);
+  }, [projectId]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -65,7 +65,7 @@ export default function ScanPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div className="glass-panel">
+      <div className="panel">
         <div className="section-header">
           <h2>Selecionar domínios para escanear</h2>
           <span className="muted">{selected.size} selecionado(s) de {domains.length} ativo(s)</span>
@@ -75,7 +75,8 @@ export default function ScanPage() {
           <p className="muted">Carregando domínios...</p>
         ) : domains.length === 0 ? (
           <p className="empty-state">
-            Nenhum domínio ativo cadastrado. Vá em <Link className="plain-link" to="/domains">Domínios</Link> para adicionar.
+            Nenhum domínio ativo cadastrado. Vá em{' '}
+            <Link className="plain-link" to={`/p/${projectId}/domains`}>Domínios</Link> para adicionar.
           </p>
         ) : (
           <>
@@ -98,7 +99,7 @@ export default function ScanPage() {
               {pageItems.map((d) => (
                 <label className="checkbox-row" key={d.id}>
                   <input type="checkbox" checked={selected.has(d.id)} onChange={() => toggle(d.id)} />
-                  {d.hostname}
+                  <span className="cell-mono">{d.hostname}</span>
                   {d.notes && <span className="muted"> — {d.notes}</span>}
                 </label>
               ))}
@@ -138,7 +139,7 @@ export default function ScanPage() {
           className="primary-btn"
           style={{ marginTop: '1rem' }}
           disabled={isRunning || selected.size === 0}
-          onClick={() => startScan([...selected], { concurrency, includeTls })}
+          onClick={() => startScan(projectId, [...selected], { concurrency, includeTls })}
         >
           {isRunning ? 'Escaneando...' : `Iniciar Scan (${selected.size} domínio${selected.size === 1 ? '' : 's'})`}
         </button>
@@ -147,7 +148,7 @@ export default function ScanPage() {
       </div>
 
       {hasResults && (
-        <div className="glass-panel">
+        <div className="panel">
           <ScanProgress
             results={results}
             completedCount={completedCount}
@@ -158,10 +159,10 @@ export default function ScanPage() {
 
           {!isRunning && runId && (
             <div className="section-header" style={{ marginTop: '1.5rem' }}>
-              <Link className="secondary-btn" to={`/reports/${runId}`}>Ver Relatório Detalhado</Link>
+              <Link className="secondary-btn" to={`/p/${projectId}/reports/${runId}`}>Ver Relatório Detalhado</Link>
               <div className="export-actions" style={{ display: 'flex', gap: '0.5rem' }}>
-                <a className="export-btn" href={api.xlsxReportUrl(runId)}>Exportar XLSX</a>
-                <a className="export-btn" href={api.pdfReportUrl(runId)}>Exportar PDF</a>
+                <a className="export-btn" href={api.xlsxReportUrl(projectId, runId)}>Exportar XLSX</a>
+                <a className="export-btn" href={api.pdfReportUrl(projectId, runId)}>Exportar PDF</a>
               </div>
             </div>
           )}
