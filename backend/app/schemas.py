@@ -134,6 +134,7 @@ class ScanRunTrigger(BaseModel):
     domain_ids: list[int] | None = None
     concurrency: int = 30
     include_tls: bool = True
+    check_s3: bool = True
 
     @field_validator("concurrency")
     @classmethod
@@ -159,6 +160,10 @@ class ScanResultOut(BaseModel):
     cname_chain: list[str]
     tls_issuer: str | None
     tls_expiry: datetime | None
+    s3_status: str | None
+    s3_bucket_name: str | None
+    s3_source: str | None
+    s3_signals: list[str]
     checked_at: datetime
 
 
@@ -176,6 +181,8 @@ class ScanRunSummary(BaseModel):
     unknown_exposure_count: int
     external_unprotected_online: int
     internal_unprotected_online: int
+    s3_public_count: int
+    s3_checked_count: int
     pct_online: float
     pct_protected: float
 

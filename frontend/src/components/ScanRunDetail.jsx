@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import StatusBadge from './StatusBadge';
 import AkamaiBadge from './AkamaiBadge';
 import ExposureBadge from './ExposureBadge';
+import S3Badge from './S3Badge';
 import Pagination from './Pagination';
 
 const PAGE_SIZE = 100;
@@ -15,6 +16,10 @@ export default function ScanRunDetail({ run, projectId }) {
       results
         .filter((r) => r.status !== 'OFFLINE' && !r.akamai_protected)
         .sort((a, b) => EXPOSURE_ORDER[a.is_internal] - EXPOSURE_ORDER[b.is_internal]),
+    [results]
+  );
+  const s3Public = useMemo(
+    () => results.filter((r) => r.s3_status === 'public').sort((a, b) => a.hostname.localeCompare(b.hostname)),
     [results]
   );
 
@@ -83,6 +88,12 @@ export default function ScanRunDetail({ run, projectId }) {
           <div className="value">{summary.external_count} / {summary.internal_count}</div>
           <div className="label">Externos / Internos</div>
         </div>
+        {summary.s3_checked_count > 0 && (
+          <div className="stat-card risk">
+            <div className="value">{summary.s3_public_count}</div>
+            <div className="label">Buckets S3 públicos (risco crítico)</div>
+          </div>
+        )}
       </div>
 
       {risky.length > 0 && (
@@ -120,6 +131,36 @@ export default function ScanRunDetail({ run, projectId }) {
         </>
       )}
 
+      {s3Public.length > 0 && (
+        <>
+          <h3 style={{ margin: '1.5rem 0 0.6rem' }}>
+            Buckets S3 expostos ({s3Public.length})
+          </h3>
+          <div className="table-container" style={{ marginBottom: '0.5rem' }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>Hostname</th>
+                  <th>Bucket</th>
+                  <th>Confiança</th>
+                  <th>Sinais</th>
+                </tr>
+              </thead>
+              <tbody>
+                {s3Public.map((r) => (
+                  <tr key={r.id}>
+                    <td className="cell-mono">{r.hostname}</td>
+                    <td className="cell-mono">{r.s3_bucket_name}</td>
+                    <td><S3Badge status={r.s3_status} source={r.s3_source} /></td>
+                    <td className="cell-muted">{(r.s3_signals || []).join('; ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
       <h3 style={{ margin: '1.5rem 0 0.6rem' }}>Tabela completa ({filtered.length})</h3>
       <div className="inline-form" style={{ marginBottom: '0.8rem' }}>
         <div className="field" style={{ maxWidth: 320 }}>
@@ -148,6 +189,7 @@ export default function ScanRunDetail({ run, projectId }) {
               <th>HTTP / Erro</th>
               <th>Akamai</th>
               <th>Exposição</th>
+              <th>S3</th>
               <th>Sinais</th>
               <th>IP</th>
               <th>Verificado em</th>
@@ -161,6 +203,7 @@ export default function ScanRunDetail({ run, projectId }) {
                 <td className="cell-muted">{r.status === 'OFFLINE' ? r.error_message : r.http_status_code}</td>
                 <td><AkamaiBadge protected={r.akamai_protected} /></td>
                 <td><ExposureBadge isInternal={r.is_internal} /></td>
+                <td><S3Badge status={r.s3_status} source={r.s3_source} /></td>
                 <td className="cell-muted">{r.akamai_signals.join(', ') || '—'}</td>
                 <td className="cell-muted">{r.resolved_ip || '—'}</td>
                 <td className="cell-muted">{new Date(r.checked_at).toLocaleString('pt-BR')}</td>

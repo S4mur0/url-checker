@@ -16,6 +16,7 @@ export default function ScanPage({ projectId }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [concurrency, setConcurrency] = useState(30);
   const [includeTls, setIncludeTls] = useState(true);
+  const [checkS3, setCheckS3] = useState(true);
 
   const { results, completedCount, counts, runId, isRunning, error, startScan } = useScanStream();
 
@@ -113,7 +114,7 @@ export default function ScanPage({ projectId }) {
           style={{ marginTop: '1rem', display: 'block' }}
           onClick={() => setShowAdvanced((v) => !v)}
         >
-          {showAdvanced ? '▾' : '▸'} Opções avançadas (concorrência, TLS)
+          {showAdvanced ? '▾' : '▸'} Opções avançadas (concorrência, TLS, buckets S3)
         </button>
 
         {showAdvanced && (
@@ -132,6 +133,10 @@ export default function ScanPage({ projectId }) {
               <input type="checkbox" checked={includeTls} onChange={(e) => setIncludeTls(e.target.checked)} />
               Verificar certificado TLS (mais lento em scans grandes)
             </label>
+            <label className="checkbox-row" style={{ paddingTop: '1.4rem' }}>
+              <input type="checkbox" checked={checkS3} onChange={(e) => setCheckS3(e.target.checked)} />
+              Verificar buckets S3 expostos
+            </label>
           </div>
         )}
 
@@ -139,7 +144,7 @@ export default function ScanPage({ projectId }) {
           className="primary-btn"
           style={{ marginTop: '1rem' }}
           disabled={isRunning || selected.size === 0}
-          onClick={() => startScan(projectId, [...selected], { concurrency, includeTls })}
+          onClick={() => startScan(projectId, [...selected], { concurrency, includeTls, checkS3 })}
         >
           {isRunning ? 'Escaneando...' : `Iniciar Scan (${selected.size} domínio${selected.size === 1 ? '' : 's'})`}
         </button>

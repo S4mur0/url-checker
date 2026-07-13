@@ -32,6 +32,9 @@ def compute_scan_summary(results: list[ScanResult]) -> dict:
         if r.status in ("ONLINE", "WARNING") and not r.akamai_protected and r.is_internal is True
     )
 
+    s3_checked_count = sum(1 for r in results if r.s3_status is not None)
+    s3_public_count = sum(1 for r in results if r.s3_status == "public")
+
     return {
         "total": total,
         "online": online,
@@ -46,6 +49,8 @@ def compute_scan_summary(results: list[ScanResult]) -> dict:
         "unknown_exposure_count": unknown_exposure_count,
         "external_unprotected_online": external_unprotected_online,
         "internal_unprotected_online": internal_unprotected_online,
+        "s3_checked_count": s3_checked_count,
+        "s3_public_count": s3_public_count,
         "pct_online": round((online + warning) / total * 100, 1) if total else 0.0,
         "pct_protected": round(protected / total * 100, 1) if total else 0.0,
     }

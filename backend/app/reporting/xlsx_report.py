@@ -27,6 +27,19 @@ INTERNAL_FILL = PatternFill("solid", fgColor=GRAY)
 HEADER_FILL = PatternFill("solid", fgColor=HEADER_BG)
 HEADER_FONT = Font(color="FFFFFF", bold=True)
 
+S3_STATUS_LABELS = {
+    "public": "PÚBLICO",
+    "private": "Privado",
+    "not_found": "Não encontrado",
+    "unknown": "Indeterminado",
+}
+S3_SOURCE_LABELS = {
+    "cname_direct": "CNAME direto (confirmado)",
+    "cname_cdn": "Atrás de CDN/WAF (não confirmado)",
+    "guess": "Mesmo nome do domínio (não confirmado)",
+}
+S3_PUBLIC_FILL = PatternFill("solid", fgColor=RED)
+
 
 def _exposure_label(r: ScanResult) -> str:
     if r.is_internal is True:
@@ -79,6 +92,8 @@ def _build_summary_sheet(wb: Workbook, scan_run: ScanRun, summary: dict, project
         ("Exposição desconhecida (DNS não resolvido)", summary["unknown_exposure_count"]),
         ("EXTERNO, online e sem proteção (risco real)", summary["external_unprotected_online"]),
         ("Interno, online e sem proteção (risco baixo)", summary["internal_unprotected_online"]),
+        ("Buckets S3 verificados", summary["s3_checked_count"]),
+        ("BUCKETS S3 PÚBLICOS (risco crítico)", summary["s3_public_count"]),
     ]
 
     start_row = 4
@@ -89,7 +104,7 @@ def _build_summary_sheet(wb: Workbook, scan_run: ScanRun, summary: dict, project
     for i, (label, value) in enumerate(metrics, start=start_row + 1):
         ws.cell(row=i, column=1, value=label)
         cell = ws.cell(row=i, column=2, value=value)
-        if label.startswith("EXTERNO"):
+        if label.startswith("EXTERNO") or label.startswith("BUCKETS S3 PÚBLICOS"):
             cell.fill = UNPROTECTED_FILL
             cell.font = Font(bold=True, color="FFFFFF")
         elif label.startswith("Interno, online"):
@@ -155,12 +170,43 @@ def _build_risk_sheet(wb: Workbook, results: list[ScanResult]) -> None:
     _autosize_columns(ws, [32, 14, 40, 12, 12, 16, 18])
 
 
+def _build_s3_sheet(wb: Workbook, results: list[ScanResult]) -> None:
+    ws = wb.create_sheet("Buckets S3")
+    headers = ["Hostname", "Nome do Bucket", "Status", "Confiança", "Sinais", "Verificado em"]
+    ws.append(headers)
+    _style_header_row(ws, 1, len(headers))
+
+    checked = [r for r in results if r.s3_status is not None]
+    status_order = {"public": 0, "unknown": 1, "private": 2, "not_found": 3}
+    checked.sort(key=lambda r: (status_order.get(r.s3_status, 9), r.domain.hostname))
+
+    for r in checked:
+        row = [
+            r.domain.hostname,
+            r.s3_bucket_name,
+            S3_STATUS_LABELS.get(r.s3_status, r.s3_status),
+            S3_SOURCE_LABELS.get(r.s3_source, r.s3_source),
+            "; ".join(r.s3_signals or []),
+            r.checked_at.strftime("%d/%m/%Y %H:%M"),
+        ]
+        ws.append(row)
+        if r.s3_status == "public":
+            line = ws.max_row
+            ws.cell(row=line, column=3).fill = S3_PUBLIC_FILL
+            ws.cell(row=line, column=3).font = Font(color="FFFFFF", bold=True)
+
+    ws.freeze_panes = "A2"
+    if checked:
+        ws.auto_filter.ref = ws.dimensions
+    _autosize_columns(ws, [32, 32, 16, 32, 50, 18])
+
+
 def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
     ws = wb.create_sheet("Detalhado")
     headers = [
         "Hostname", "Exposição", "URL Verificada", "Status", "Código HTTP", "Erro",
         "Tempo Resposta (ms)", "IP Resolvido", "Protegido Akamai", "Sinais Akamai",
-        "Cadeia CNAME", "TLS Issuer", "TLS Expira em", "Verificado em",
+        "Cadeia CNAME", "TLS Issuer", "TLS Expira em", "S3 Status", "S3 Bucket", "Verificado em",
     ]
     ws.append(headers)
     _style_header_row(ws, 1, len(headers))
@@ -180,6 +226,8 @@ def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
             " -> ".join(r.cname_chain),
             r.tls_issuer,
             r.tls_expiry.strftime("%d/%m/%Y") if r.tls_expiry else None,
+            S3_STATUS_LABELS.get(r.s3_status, "—") if r.s3_status else "—",
+            r.s3_bucket_name,
             r.checked_at.strftime("%d/%m/%Y %H:%M"),
         ]
         ws.append(row)
@@ -190,10 +238,13 @@ def _build_detail_sheet(wb: Workbook, results: list[ScanResult]) -> None:
             ws.cell(row=line, column=2).fill = exposure_fill
             ws.cell(row=line, column=2).font = Font(color="FFFFFF", bold=True)
         ws.cell(row=line, column=9).fill = PROTECTED_FILL if r.akamai_protected else UNPROTECTED_FILL
+        if r.s3_status == "public":
+            ws.cell(row=line, column=14).fill = S3_PUBLIC_FILL
+            ws.cell(row=line, column=14).font = Font(color="FFFFFF", bold=True)
 
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
-    _autosize_columns(ws, [32, 14, 40, 10, 12, 20, 16, 16, 14, 40, 40, 24, 14, 18])
+    _autosize_columns(ws, [32, 14, 40, 10, 12, 20, 16, 16, 14, 40, 40, 24, 14, 14, 32, 18])
 
 
 def build_xlsx_report(scan_run: ScanRun, results: list[ScanResult], project_name: str = "") -> io.BytesIO:
@@ -201,6 +252,7 @@ def build_xlsx_report(scan_run: ScanRun, results: list[ScanResult], project_name
     wb = Workbook()
     _build_summary_sheet(wb, scan_run, summary, project_name)
     _build_risk_sheet(wb, results)
+    _build_s3_sheet(wb, results)
     _build_detail_sheet(wb, results)
 
     buffer = io.BytesIO()

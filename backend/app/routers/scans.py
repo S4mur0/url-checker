@@ -35,6 +35,10 @@ def _result_to_out(result: ScanResult) -> ScanResultOut:
         cname_chain=result.cname_chain,
         tls_issuer=result.tls_issuer,
         tls_expiry=result.tls_expiry,
+        s3_status=result.s3_status,
+        s3_bucket_name=result.s3_bucket_name,
+        s3_source=result.s3_source,
+        s3_signals=result.s3_signals or [],
         checked_at=result.checked_at,
     )
 
@@ -76,12 +80,15 @@ def trigger_scan_stream(
     domain_snapshot = [(d.id, d.hostname) for d in domains]
     concurrency = payload.concurrency
     include_tls = payload.include_tls
+    check_s3 = payload.check_s3
 
     async def event_generator() -> AsyncIterator[bytes]:
         session = SessionLocal()
         try:
             domains_for_scan = [Domain(id=did, hostname=hostname) for did, hostname in domain_snapshot]
-            async for result in run_scan(domains_for_scan, concurrency=concurrency, include_tls=include_tls):
+            async for result in run_scan(
+                domains_for_scan, concurrency=concurrency, include_tls=include_tls, check_s3=check_s3
+            ):
                 scan_result = ScanResult(
                     scan_run_id=run_id,
                     domain_id=result.domain_id,
@@ -97,6 +104,10 @@ def trigger_scan_stream(
                     cname_chain=result.cname_chain,
                     tls_issuer=result.tls_issuer,
                     tls_expiry=result.tls_expiry,
+                    s3_status=result.s3_status,
+                    s3_bucket_name=result.s3_bucket_name,
+                    s3_source=result.s3_source,
+                    s3_signals=result.s3_signals,
                 )
                 session.add(scan_result)
                 session.commit()
@@ -117,6 +128,10 @@ def trigger_scan_stream(
                     "cname_chain": result.cname_chain,
                     "tls_issuer": result.tls_issuer,
                     "tls_expiry": result.tls_expiry.isoformat() if result.tls_expiry else None,
+                    "s3_status": result.s3_status,
+                    "s3_bucket_name": result.s3_bucket_name,
+                    "s3_source": result.s3_source,
+                    "s3_signals": result.s3_signals,
                 }
                 yield f"data: {json.dumps(event)}\n\n".encode()
 

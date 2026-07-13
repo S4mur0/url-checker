@@ -27,12 +27,27 @@ def _exposure_class(is_internal: bool | None) -> str:
     return "unknown"
 
 
+S3_STATUS_LABELS = {
+    "public": "PÚBLICO",
+    "private": "Privado",
+    "not_found": "Não encontrado",
+    "unknown": "Indeterminado",
+}
+S3_SOURCE_LABELS = {
+    "cname_direct": "CNAME direto (confirmado)",
+    "cname_cdn": "Atrás de CDN/WAF (não confirmado)",
+    "guess": "Mesmo nome do domínio (não confirmado)",
+}
+
+
 _env = Environment(
     loader=FileSystemLoader(TEMPLATES_DIR),
     autoescape=select_autoescape(["html"]),
 )
 _env.filters["exposure_label"] = _exposure_label
 _env.filters["exposure_class"] = _exposure_class
+_env.filters["s3_status_label"] = lambda s: S3_STATUS_LABELS.get(s, s)
+_env.filters["s3_source_label"] = lambda s: S3_SOURCE_LABELS.get(s, s)
 
 
 def _donut_segments(summary: dict) -> list[dict]:
@@ -73,6 +88,10 @@ def build_pdf_report(scan_run: ScanRun, results: list[ScanResult], project_name:
         key=lambda r: (exposure_order[r.is_internal], r.domain.hostname),
     )
     sorted_results = sorted(results, key=lambda r: r.domain.hostname)
+    s3_public = sorted(
+        (r for r in results if r.s3_status == "public"),
+        key=lambda r: r.domain.hostname,
+    )
 
     template = _env.get_template("executive_report.html")
     html_content = template.render(
@@ -80,6 +99,7 @@ def build_pdf_report(scan_run: ScanRun, results: list[ScanResult], project_name:
         summary=summary,
         risky=risky,
         results=sorted_results,
+        s3_public=s3_public,
         donut_segments=_donut_segments(summary),
         project_name=project_name,
         generated_at=datetime.now(timezone.utc),

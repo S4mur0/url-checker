@@ -103,6 +103,14 @@ class ScanResult(Base):
     tls_issuer: Mapped[str | None] = mapped_column(String(255), nullable=True)
     tls_expiry: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    s3_status: Mapped[str | None] = mapped_column(String(20), nullable=True)  # public | private | not_found | unknown
+    s3_bucket_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    s3_source: Mapped[str | None] = mapped_column(String(20), nullable=True)  # cname_direct | cname_cdn | guess
+    # nullable (não list, sem default) de propósito: coluna nova adicionada via
+    # ALTER TABLE numa tabela com linhas existentes - essas linhas antigas ficam
+    # com NULL no banco, e um default só no Python não retroage sobre elas.
+    s3_signals: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
     checked_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     domain: Mapped["Domain"] = relationship(back_populates="results")

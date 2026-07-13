@@ -16,6 +16,7 @@ export default function ScanRunList({ runs, projectId }) {
             <th>Online</th>
             <th>Protegidos</th>
             <th>Risco real (externo, sem proteção)</th>
+            <th>S3 público</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -33,6 +34,13 @@ export default function ScanRunList({ runs, projectId }) {
                   <span className="badge unprotected">{run.summary.external_unprotected_online}</span>
                 ) : (
                   '0'
+                )}
+              </td>
+              <td>
+                {run.summary && run.summary.s3_public_count > 0 ? (
+                  <span className="badge unprotected">{run.summary.s3_public_count}</span>
+                ) : (
+                  <span className="muted">{run.summary && run.summary.s3_checked_count > 0 ? '0' : '—'}</span>
                 )}
               </td>
               <td className="muted">{run.status === 'completed' ? 'Concluído' : 'Em execução'}</td>

@@ -42,6 +42,10 @@
         <div class="value">{{ summary.external_count }} / {{ summary.internal_count }}</div>
         <div class="label">Domínios externos / internos</div>
     </div>
+    <div class="stat-card risk">
+        <div class="value">{{ summary.s3_public_count }}</div>
+        <div class="label">Buckets S3 públicos (risco crítico)</div>
+    </div>
 </div>
 
 <div class="narrative">
@@ -117,6 +121,33 @@
 <p>Nenhum domínio online sem proteção Akamai identificado neste scan.</p>
 {% endif %}
 
+<h2 class="section-title">Buckets S3 Expostos</h2>
+
+{% if s3_public %}
+<table class="risk-table">
+    <thead>
+        <tr>
+            <th>Hostname</th>
+            <th>Bucket</th>
+            <th>Confiança</th>
+            <th>Sinal</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in s3_public %}
+        <tr>
+            <td>{{ r.domain.hostname }}</td>
+            <td>{{ r.s3_bucket_name }}</td>
+            <td>{{ r.s3_source | s3_source_label }}</td>
+            <td>{{ (r.s3_signals or []) | join('; ') or "-" }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>Nenhum bucket S3 público identificado neste scan.</p>
+{% endif %}
+
 <h2 class="section-title">Tabela Detalhada</h2>
 
 <table>
@@ -127,6 +158,7 @@
             <th>Status</th>
             <th>HTTP</th>
             <th>Protegido</th>
+            <th>S3</th>
             <th>Tempo (ms)</th>
             <th>IP</th>
             <th>Verificado em</th>
@@ -142,6 +174,7 @@
             <td><span class="badge {{ 'protected' if r.akamai_protected else 'unprotected' }}">
                 {{ "SIM" if r.akamai_protected else "NÃO" }}
             </span></td>
+            <td>{% if r.s3_status %}<span class="badge {{ 'unprotected' if r.s3_status == 'public' else 'protected' }}">{{ r.s3_status | s3_status_label }}</span>{% else %}-{% endif %}</td>
             <td>{{ "%.0f"|format(r.response_time_ms) if r.response_time_ms else "-" }}</td>
             <td>{{ r.resolved_ip or "-" }}</td>
             <td>{{ r.checked_at.strftime("%d/%m/%Y %H:%M") }}</td>

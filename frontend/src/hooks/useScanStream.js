@@ -7,6 +7,7 @@ const INITIAL_COUNTS = {
   PROTECTED: 0,
   UNPROTECTED: 0,
   EXTERNAL_UNPROTECTED: 0,
+  S3_PUBLIC: 0,
 };
 const LIVE_TABLE_LIMIT = 200;
 
@@ -34,6 +35,7 @@ export function useScanStream() {
           domain_ids: domainIds ?? null,
           concurrency: options.concurrency ?? 30,
           include_tls: options.includeTls ?? true,
+          check_s3: options.checkS3 ?? true,
         }),
       });
 
@@ -77,6 +79,7 @@ export function useScanStream() {
             PROTECTED: prev.PROTECTED + (payload.akamai_protected ? 1 : 0),
             UNPROTECTED: prev.UNPROTECTED + (payload.akamai_protected ? 0 : 1),
             EXTERNAL_UNPROTECTED: prev.EXTERNAL_UNPROTECTED + (isExternalUnprotected ? 1 : 0),
+            S3_PUBLIC: prev.S3_PUBLIC + (payload.s3_status === 'public' ? 1 : 0),
           }));
         }
       }

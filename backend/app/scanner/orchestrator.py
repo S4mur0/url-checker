@@ -1,10 +1,10 @@
-"""Orquestra a checagem completa de um domínio (HTTP + DNS + Akamai + TLS) e
-o scan de um lote de domínios em paralelo, com streaming dos resultados
+"""Orquestra a checagem completa de um domínio (HTTP + DNS + Akamai + TLS + S3)
+e o scan de um lote de domínios em paralelo, com streaming dos resultados
 conforme completam."""
 
 import asyncio
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 import httpx
@@ -13,6 +13,7 @@ from app.models import Domain
 from app.scanner.detector import combine_akamai_detection
 from app.scanner.dns_check import is_internal_ip, resolve_a_record, resolve_cname_chain
 from app.scanner.http_check import check_domain_http
+from app.scanner.s3_check import check_s3_for_domain
 from app.scanner.tls_check import get_tls_cert_info
 
 
@@ -32,6 +33,10 @@ class DomainScanResult:
     cname_chain: list[str]
     tls_issuer: str | None
     tls_expiry: datetime | None
+    s3_status: str | None = None
+    s3_bucket_name: str | None = None
+    s3_source: str | None = None
+    s3_signals: list[str] = field(default_factory=list)
 
 
 async def scan_domain(
@@ -39,6 +44,7 @@ async def scan_domain(
     domain: Domain,
     semaphore: asyncio.Semaphore,
     include_tls: bool = True,
+    check_s3: bool = True,
 ) -> DomainScanResult:
     async with semaphore:
         http_result = await check_domain_http(client, domain.hostname)
@@ -53,6 +59,15 @@ async def scan_domain(
         tls_issuer, tls_expiry = (None, None)
         if include_tls and http_result.status != "OFFLINE":
             tls_issuer, tls_expiry = await asyncio.to_thread(get_tls_cert_info, domain.hostname)
+
+        s3_status = s3_bucket_name = s3_source = None
+        s3_signals: list[str] = []
+        if check_s3:
+            s3_result = await check_s3_for_domain(client, domain.hostname, cname_chain, protected)
+            s3_status = s3_result["status"]
+            s3_bucket_name = s3_result["bucket_name"]
+            s3_source = s3_result["source"]
+            s3_signals = s3_result["signals"]
 
         return DomainScanResult(
             domain_id=domain.id,
@@ -69,15 +84,25 @@ async def scan_domain(
             cname_chain=cname_chain,
             tls_issuer=tls_issuer,
             tls_expiry=tls_expiry,
+            s3_status=s3_status,
+            s3_bucket_name=s3_bucket_name,
+            s3_source=s3_source,
+            s3_signals=s3_signals,
         )
 
 
 async def run_scan(
-    domains: list[Domain], concurrency: int = 30, include_tls: bool = True
+    domains: list[Domain],
+    concurrency: int = 30,
+    include_tls: bool = True,
+    check_s3: bool = True,
 ) -> AsyncIterator[DomainScanResult]:
     semaphore = asyncio.Semaphore(concurrency)
     limits = httpx.Limits(max_connections=concurrency * 2, max_keepalive_connections=concurrency)
     async with httpx.AsyncClient(follow_redirects=True, limits=limits) as client:
-        tasks = [asyncio.create_task(scan_domain(client, d, semaphore, include_tls)) for d in domains]
+        tasks = [
+            asyncio.create_task(scan_domain(client, d, semaphore, include_tls, check_s3))
+            for d in domains
+        ]
         for coro in asyncio.as_completed(tasks):
             yield await coro

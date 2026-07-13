@@ -1,6 +1,7 @@
 import StatusBadge from './StatusBadge';
 import AkamaiBadge from './AkamaiBadge';
 import ExposureBadge from './ExposureBadge';
+import S3Badge from './S3Badge';
 
 export default function ScanProgress({ results, completedCount, counts, total, isRunning }) {
   const isCapped = completedCount > results.length;
@@ -20,6 +21,11 @@ export default function ScanProgress({ results, completedCount, counts, total, i
           {counts.EXTERNAL_UNPROTECTED > 0 && (
             <p className="muted" style={{ marginTop: '0.4rem', color: 'var(--status-offline)' }}>
               ⚠ {counts.EXTERNAL_UNPROTECTED} externo(s) e sem proteção — risco real
+            </p>
+          )}
+          {counts.S3_PUBLIC > 0 && (
+            <p className="muted" style={{ marginTop: '0.2rem', color: 'var(--status-offline)' }}>
+              ⚠ {counts.S3_PUBLIC} bucket(s) S3 público(s) encontrado(s)
             </p>
           )}
         </div>
@@ -42,6 +48,7 @@ export default function ScanProgress({ results, completedCount, counts, total, i
               <th>Código HTTP / Erro</th>
               <th>Akamai</th>
               <th>Exposição</th>
+              <th>S3</th>
               <th>IP</th>
               <th>Tempo (ms)</th>
             </tr>
@@ -54,6 +61,7 @@ export default function ScanProgress({ results, completedCount, counts, total, i
                 <td className="cell-muted">{r.status === 'OFFLINE' ? r.error_message : r.http_status_code}</td>
                 <td><AkamaiBadge protected={r.akamai_protected} /></td>
                 <td><ExposureBadge isInternal={r.is_internal} /></td>
+                <td><S3Badge status={r.s3_status} source={r.s3_source} /></td>
                 <td className="cell-muted">{r.resolved_ip || '—'}</td>
                 <td className="cell-muted">{r.response_time_ms ? Math.round(r.response_time_ms) : '—'}</td>
               </tr>
