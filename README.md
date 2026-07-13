@@ -11,7 +11,7 @@ Domínios e scans são organizados por **projeto** (ex: um projeto por cliente/e
 Pré-requisito: Linux (Ubuntu/Debian ou WSL2 com systemd habilitado) com `sudo`.
 
 ```bash
-git clone https://github.com/S4mur0/url-checker.git
+git clone https://github.com/S4mur0/url-checker.git url_checker
 cd url_checker
 ./setup.sh
 ```
