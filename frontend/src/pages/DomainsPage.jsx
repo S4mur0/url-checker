@@ -49,6 +49,10 @@ export default function DomainsPage({ projectId }) {
     return result;
   }
 
+  async function handleDiscover(rootDomain) {
+    return api.discoverSubdomains(projectId, rootDomain);
+  }
+
   async function handleUpdate(id, payload) {
     await api.updateDomain(projectId, id, payload);
     await loadDomains();
@@ -179,6 +183,7 @@ export default function DomainsPage({ projectId }) {
           onClose={() => setShowBulkModal(false)}
           onBulkCreate={handleBulkCreate}
           onBulkCreateItems={handleBulkCreateItems}
+          onDiscover={handleDiscover}
         />
       )}
     </div>

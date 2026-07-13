@@ -41,6 +41,8 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ domain_ids: domainIds, hard }),
     }),
+  discoverSubdomains: (projectId, rootDomain) =>
+    request(`/projects/${projectId}/domains/discover?root_domain=${encodeURIComponent(rootDomain)}`),
 
   listScanRuns: (projectId) => request(`/projects/${projectId}/scan-runs`),
   getScanRun: (projectId, id) => request(`/projects/${projectId}/scan-runs/${id}`),

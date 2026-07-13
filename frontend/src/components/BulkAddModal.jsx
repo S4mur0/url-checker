@@ -3,7 +3,7 @@ import { parseCsv, guessHostnameColumn, guessNotesColumn } from '../utils/csv';
 
 const NONE = '__none__';
 
-export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems }) {
+export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems, onDiscover }) {
   const [mode, setMode] = useState('text');
   const [text, setText] = useState('');
   const [fileName, setFileName] = useState('');
@@ -13,9 +13,41 @@ export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems 
   const [hostCol, setHostCol] = useState(0);
   const [notesCol, setNotesCol] = useState(NONE);
 
+  const [rootDomain, setRootDomain] = useState('');
+  const [discovering, setDiscovering] = useState(false);
+  const [discoverData, setDiscoverData] = useState(null);
+  const [discoverError, setDiscoverError] = useState(null);
+  const [discoverSelected, setDiscoverSelected] = useState(new Set());
+
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+
+  async function handleDiscover() {
+    const root = rootDomain.trim().toLowerCase();
+    if (!root) return;
+    setDiscovering(true);
+    setDiscoverError(null);
+    setDiscoverData(null);
+    setResult(null);
+    try {
+      const data = await onDiscover(root);
+      setDiscoverData(data);
+      setDiscoverSelected(new Set(data.candidates.map((c) => c.hostname)));
+    } catch (err) {
+      setDiscoverError(err.message);
+    } finally {
+      setDiscovering(false);
+    }
+  }
+
+  function toggleDiscoverCandidate(hostname) {
+    setDiscoverSelected((prev) => {
+      const next = new Set(prev);
+      next.has(hostname) ? next.delete(hostname) : next.add(hostname);
+      return next;
+    });
+  }
 
   async function handleFileChange(e) {
     const file = e.target.files[0];
@@ -51,6 +83,12 @@ export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems 
           .filter((item) => item.hostname);
         const res = await onBulkCreateItems(items);
         setResult(res);
+      } else if (mode === 'discover') {
+        const items = discoverData.candidates
+          .filter((c) => discoverSelected.has(c.hostname))
+          .map((c) => ({ hostname: c.hostname, notes: discoverData.root_domain }));
+        const res = await onBulkCreateItems(items);
+        setResult(res);
       } else {
         const res = await onBulkCreate(text);
         setResult(res);
@@ -62,7 +100,12 @@ export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems 
     }
   }
 
-  const canSubmit = mode === 'csv' ? csvRows.length > 0 : text.trim().length > 0;
+  const canSubmit =
+    mode === 'csv'
+      ? csvRows.length > 0
+      : mode === 'discover'
+      ? discoverSelected.size > 0
+      : text.trim().length > 0;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -81,6 +124,9 @@ export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems 
           </button>
           <button className={`tab-btn ${mode === 'csv' ? 'active' : ''}`} onClick={() => setMode('csv')}>
             Importar CSV
+          </button>
+          <button className={`tab-btn ${mode === 'discover' ? 'active' : ''}`} onClick={() => setMode('discover')}>
+            Descobrir Subdomínios
           </button>
         </div>
 
@@ -162,6 +208,69 @@ export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems 
           </div>
         )}
 
+        {mode === 'discover' && (
+          <div>
+            <p className="muted" style={{ marginBottom: '0.8rem' }}>
+              Busca em logs públicos de Certificate Transparency (crt.sh) por subdomínios que já
+              receberam certificado TLS — não é força bruta, só o que já é público. Pode levar até
+              1 minuto.
+            </p>
+            <div className="inline-form" style={{ marginBottom: '1rem' }}>
+              <div className="field" style={{ maxWidth: 320 }}>
+                <input
+                  type="text"
+                  placeholder="ex: exemplo.com.br"
+                  value={rootDomain}
+                  onChange={(e) => setRootDomain(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !discovering && handleDiscover()}
+                />
+              </div>
+              <button className="secondary-btn" onClick={handleDiscover} disabled={discovering || !rootDomain.trim()}>
+                {discovering ? 'Buscando... (até 1 min)' : 'Buscar'}
+              </button>
+            </div>
+
+            {discoverError && <p style={{ color: 'var(--status-offline)' }}>{discoverError}</p>}
+
+            {discoverData && discoverData.candidates.length === 0 && (
+              <p className="empty-state">Nenhum subdomínio encontrado para {discoverData.root_domain}.</p>
+            )}
+
+            {discoverData && discoverData.candidates.length > 0 && (
+              <>
+                <div className="inline-form" style={{ marginBottom: '0.5rem' }}>
+                  <span className="muted">
+                    {discoverData.candidates.length} subdomínio(s) encontrado(s), {discoverSelected.size} selecionado(s)
+                    {discoverData.truncated && ' (lista truncada no limite máximo)'}
+                  </span>
+                  <button
+                    className="link-btn"
+                    onClick={() => setDiscoverSelected(new Set(discoverData.candidates.map((c) => c.hostname)))}
+                  >
+                    Selecionar todos
+                  </button>
+                  <button className="link-btn" onClick={() => setDiscoverSelected(new Set())}>
+                    Limpar seleção
+                  </button>
+                </div>
+                <div style={{ maxHeight: 260, overflowY: 'auto' }}>
+                  {discoverData.candidates.map((c) => (
+                    <label className="checkbox-row" key={c.hostname}>
+                      <input
+                        type="checkbox"
+                        checked={discoverSelected.has(c.hostname)}
+                        onChange={() => toggleDiscoverCandidate(c.hostname)}
+                      />
+                      <span className="cell-mono">{c.hostname}</span>
+                      {c.already_tracked && <span className="muted"> — já cadastrado</span>}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {error && <p style={{ color: 'var(--status-offline)' }}>{error}</p>}
 
         {result && (
@@ -174,7 +283,13 @@ export default function BulkAddModal({ onClose, onBulkCreate, onBulkCreateItems 
         <div className="modal-actions">
           <button className="secondary-btn" onClick={onClose}>Fechar</button>
           <button className="primary-btn" onClick={handleSubmit} disabled={submitting || !canSubmit}>
-            {submitting ? 'Adicionando...' : mode === 'csv' ? `Importar ${csvRows.length} linha(s)` : 'Adicionar domínios'}
+            {submitting
+              ? 'Adicionando...'
+              : mode === 'csv'
+              ? `Importar ${csvRows.length} linha(s)`
+              : mode === 'discover'
+              ? `Adicionar ${discoverSelected.size} selecionado(s)`
+              : 'Adicionar domínios'}
           </button>
         </div>
       </div>

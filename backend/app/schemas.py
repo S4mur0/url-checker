@@ -130,6 +130,18 @@ class DomainBulkDelete(BaseModel):
     hard: bool = True
 
 
+class DiscoveredSubdomain(BaseModel):
+    hostname: str
+    already_tracked: bool
+
+
+class DiscoverResponse(BaseModel):
+    root_domain: str
+    candidates: list[DiscoveredSubdomain]
+    truncated: bool
+    ok: bool
+
+
 class ScanRunTrigger(BaseModel):
     domain_ids: list[int] | None = None
     concurrency: int = 30

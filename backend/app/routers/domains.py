@@ -5,7 +5,10 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_project_or_404
 from app.models import Domain, Project
+from app.scanner.ct_discovery import discover_subdomains
 from app.schemas import (
+    DiscoverResponse,
+    DiscoveredSubdomain,
     DomainBulkCreate,
     DomainBulkDelete,
     DomainBulkItemsCreate,
@@ -96,6 +99,33 @@ def bulk_create_domain_items(
 ):
     rows = [(item.hostname, item.notes) for item in payload.items if item.hostname.strip()]
     return _bulk_insert(db, project.id, rows)
+
+
+@router.get("/discover", response_model=DiscoverResponse)
+async def discover(
+    root_domain: str,
+    project: Project = Depends(get_project_or_404),
+    db: Session = Depends(get_db),
+):
+    root = normalize_hostname(root_domain)
+    if not root:
+        raise HTTPException(status_code=400, detail="domínio raiz vazio")
+
+    result = await discover_subdomains(root)
+
+    tracked = {
+        h for (h,) in db.execute(select(Domain.hostname).where(Domain.project_id == project.id))
+    }
+    candidates = [
+        DiscoveredSubdomain(hostname=h, already_tracked=h in tracked)
+        for h in result["candidates"]
+    ]
+    return DiscoverResponse(
+        root_domain=result["root_domain"],
+        candidates=candidates,
+        truncated=result["truncated"],
+        ok=result["ok"],
+    )
 
 
 @router.get("/{domain_id}", response_model=DomainOut)
